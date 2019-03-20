@@ -335,43 +335,45 @@ Consider the following example:
 
 	#include <nana/gui/wvl.hpp>
 	#include <nana/gui/widgets/button.hpp>
-	#include <nana/gui/widgets/progressbar.hpp>
-	class example : public nana::form
-	{public:
-		example()
+	#include <nana/gui/widgets/progress.hpp>
+
+	class example2 : public nana::form
+	{
+	public:
+		example2()
 		{
-			btn_start_.create(*this, 10, 10, 100, 20);
-			btn_start_.caption(STR("Start"));
-			btn_start_.events().click(*this, &example::_m_start);
-			btn_cancel_.create(*this, 120, 10, 100, 20);
-			btn_cancel_.caption(STR("Cancel"));
-			btn_cancel_.events().click(*this, &example::_m_cancel);
-			prog_.create(*this, 10, 40, 280, 20);
+			btn_start_.create(*this, nana::rectangle(10, 10, 100, 20));
+			btn_start_.caption(("Start"));
+			btn_start_.events().click([this] { _m_start(); });
+			btn_cancel_.create(*this, nana::rectangle(120, 10, 100, 20));
+			btn_cancel_.caption(("Cancel"));
+			btn_cancel_.events().click([this] { _m_cancel(); });
+			prog_.create(*this, nana::rectangle(10, 40, 280, 20));
 		}
-	 private:
+	private:
 		void _m_start()
 		{
 			working_ = true;
 			btn_start_.enabled(false);
 			prog_.amount(100);
-			for(int i = 0; i < 100 && working_; ++i)
+			for (int i = 0; i < 100 && working_; ++i)
 			{
 				nana::system::sleep(1000); //a long-running simulation
 				prog_.value(i + 1);
 			}
 			btn_start_.enabled(true);
 		}
-		void _m_cancel(){working_ = false;}
+		void _m_cancel() { working_ = false; }
 
-		bool 				working_ ;
-		nana::button 	btn_start_ ;
-		nana::button 	btn_cancel_ ;
-		nana::progressbar prog_ ;
+		bool                            working_;
+		nana::button    btn_start_;
+		nana::button    btn_cancel_;
+		nana::progress prog_;
 	};
 
 	int main()
 	{
-		example ex;
+		example2 ex;
 		ex.show();
 		nana::exec();
 		return 0;
@@ -390,29 +392,30 @@ Consider the following solution:
 
 	#include <nana/gui/wvl.hpp>
 	#include <nana/gui/widgets/button.hpp>
-	#include <nana/gui/widgets/progressbar.hpp>
+	#include <nana/gui/widgets/progress.hpp>
 	#include <nana/threads/pool.hpp>
-	class example : public nana::form
+	
+	class example3 : public nana::form
 	{
-	 public:
-		example()
+	public:
+		example3()
 		{
-			btn_start_.create(*this, 10, 10, 100, 20);
-			btn_start_.caption(STR("Start"));
-			btn_start_.events().click(nana::threads::pool_push(pool_, *this, &example::_m_start));
-			btn_cancel_.create(*this, 120, 10, 100, 20);
-			btn_cancel_.caption(STR("Cancel"));
-			btn_cancel_.events().click(*this, &example::_m_cancel);
-			prog_.create(*this, 10, 40, 280, 20);
-			this->make_event<nana::events::unload>(*this, &example::_m_cancel);
+			btn_start_.create(*this, nana::rectangle(10, 10, 100, 20));
+			btn_start_.caption(("Start"));
+			btn_start_.events().click(nana::threads::pool_push(pool_, *this, &example3::_m_start));
+			btn_cancel_.create(*this, nana::rectangle(120, 10, 100, 20));
+			btn_cancel_.caption(("Cancel"));
+			btn_cancel_.events().click([this] { _m_cancel(); });
+			prog_.create(*this, nana::rectangle(10, 40, 280, 20));
+			//this->umake_event(btn_cancel_.events().click);
 		}
-	 private:
+	private:
 		void _m_start()
 		{
 			working_ = true;
 			btn_start_.enabled(false);
 			prog_.amount(100);
-			for(int i = 0; i < 100 && working_; ++i)
+			for (int i = 0; i < 100 && working_; ++i)
 			{
 				nana::system::sleep(1000); //a long-running simulation
 				prog_.value(i + 1);
@@ -423,17 +426,17 @@ Consider the following solution:
 		{
 			working_ = false;
 		}
-		private:
+	private:
 		volatile bool working_;
 		nana::button btn_start_;
 		nana::button btn_cancel_;
-		nana::progressbar prog_;
+		nana::progress prog_;
 		nana::threads::pool pool_;
 	};
 
 	int main()
 	{
-		example ex;
+		example3 ex;
 		ex.show();
 		nana::exec();
 		return 0;
@@ -441,35 +444,37 @@ Consider the following solution:
 
 ![](long-running2.jpg)
 
-The Nana C++ Library provides a threadpool class. To solute this problem, threadpool can help developer to get rid of thread managment, such as, how to create thread? how to wait for a thread finish? and so on. Compare these tow pieces of code, they are very close, but the most important difference between these tow pieces of code is `_m_start()` is dispatched to the threadpool and execute in a background thread, the UI thread is not blocking and free to accept new events.
+The Nana C++ Library provides the threadpool class. The new code listed above that uses threadpool remains mostly the same as the previous example, but an important difference is `_m_start()` being dispatched to the threadpool. With this new arrangement, this member function is put into a so called "background" thread. We have gained a marked improvement. The UI thread is no longer exhibiting blocking behaviour. It is now free to accept events without freezing up.
 
-There is a function named pool_push, it creates a pool_pusher function object to push the `_m_start()` into threadpool. Registering the pool_pusher function object as a button event, the pool_pusher function object will be called to push the `_m_start()` as a task into threadpool while clicking on the button.
+We conceive that the nana threadpool will greatly ease the developer of the burden of thread managment. Coding task such as creating thread(s) or waiting for them to finish is much simplified. 
 
-In this version, the form makes an unload event also calling `_m_cancel()`, when closes the form, the application drops the rest of operations. But there is one question need to be answered, when the long-running operation is working, closing the form will closes the buttons and progressbar, and at the same time, the long-running operation is not finish synchronous, will crash the application when long-running operation calls methods of button and progressbar after closing the form? The anwser is YES, but the code above avoid the destruction of button and progressbar before the finish of `_m_start()`, the threadpool is defined following buttons and progressbar, this means the threadpool is destructed before the button and the progressbar, when destruct the threadpool, it waits until all worker thread is finish.
+In the above example, the function pool_push creates a pool_pusher function object to push the `_m_start()` into threadpool. We say that this pool_pusher function object is registered in the threadpool to achieve the effect of "synchronisation decoupling". When the button is clicked, the pool_pusher function object will be called to push the `_m_start()` as a task into threadpool.
 
-Handling a blocking operation with a background thread.
+In this version, the form makes an unload event also calling `_m_cancel()` (commented out). When the form closes, the application drops the rest of operations. But there is one question need to be answered, when the long-running operation is still in executioin, closing the form will closes the buttons and progressbar. If during this time the long-running operation is not finished, the application will crash when this unfinished long-running process calls methods of button and progressbar which are now destroyed, will the applicaiton program crash because of this? The anwser is YES. Gladly, the code above avoid the destruction of button and progressbar before `_m_start()` finishes. Since our threadpool is defined after buttons and progressbar, it will be destroyed first. When a threadpool is being destroyed, the class destructor will wait until all worker thread is finish.
+
+Avoiding blocking by using background thread
 
 A long time blocking operation is usually uncancellable and not able to get the progress of process. In this situation, application usually updates UI to indicate it is working.
 
 	#include <nana/gui/wvl.hpp>
 	#include <nana/gui/widgets/button.hpp>
-	#include <nana/gui/widgets/progressbar.hpp>
+	#include <nana/gui/widgets/progress.hpp>
 	#include <nana/threads/pool.hpp>
-	class example
-	: public nana::form
+	
+	class example4 : public nana::form
 	{
-	 public:
-		example()
+	public:
+		example4()
 		{
-			btn_start_.create(*this, 10, 10, 100, 20);
-			btn_start_.caption(STR("Start"));
-			btn_start_.events().click(nana::threads::pool_push(pool_, *this, &example::_m_start));
-			btn_start_.events().click(nana::threads::pool_push(pool_, *this, &example::_m_ui_update));
-			prog_.create(*this, 10, 40, 280, 20);
-			prog_.style(false);
-		this->make_event<nana::events::unload>(*this, &example::_m_cancel);
+			btn_start_.create(*this, nana::rectangle(10, 10, 100, 20));
+			btn_start_.caption(("Start"));
+			btn_start_.events().click(nana::threads::pool_push(pool_, *this, &example4::_m_start));
+			btn_start_.events().click(nana::threads::pool_push(pool_, *this, &example4::_m_ui_update));
+			prog_.create(*this, nana::rectangle(10, 40, 280, 20));
+			//prog_.style(false);
+			//this->make_event<nana::events::unload>(*this, &example::_m_cancel);
 		}
-	 private:
+	private:
 		void _m_start()
 		{
 			btn_start_.enabled(false);
@@ -478,29 +483,29 @@ A long time blocking operation is usually uncancellable and not able to get the 
 		}
 		void _m_ui_update()
 		{
-			while(btn_start_.enabled() == false)
+			while (btn_start_.enabled() == false)
 			{
 				prog_.inc();
 				nana::system::sleep(100);
 			}
 		}
-		void _m_cancel(const nana::eventinfo& ei)
+		void _m_cancel(const nana::event_arg& ei)
 		{
-			if(false == btn_start_.enabled())
-			ei.unload.cancel = true;
+			if (false == btn_start_.enabled())
+				ei.unload.cancel = true; // Will not compile
 		}
-	 private:
+	private:
 		nana::button btn_start_;
-		nana::progressbar prog_;
+		nana::progress prog_;
 		nana::threads::pool pool_;
 	};
 
 	int main()
 	{
-	example ex;
-	ex.show();
-	nana::exec();
-	return 0;
+		example4 ex;
+		ex.show();
+		nana::exec();
+		return 0;
 	}
 
 ![](long-running3.jpg)
