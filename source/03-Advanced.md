@@ -335,43 +335,45 @@ Consider the following example:
 
 	#include <nana/gui/wvl.hpp>
 	#include <nana/gui/widgets/button.hpp>
-	#include <nana/gui/widgets/progressbar.hpp>
-	class example : public nana::form
-	{public:
-		example()
+	#include <nana/gui/widgets/progress.hpp>
+
+	class example2 : public nana::form
+	{
+	public:
+		example2()
 		{
-			btn_start_.create(*this, 10, 10, 100, 20);
-			btn_start_.caption(STR("Start"));
-			btn_start_.events().click(*this, &example::_m_start);
-			btn_cancel_.create(*this, 120, 10, 100, 20);
-			btn_cancel_.caption(STR("Cancel"));
-			btn_cancel_.events().click(*this, &example::_m_cancel);
-			prog_.create(*this, 10, 40, 280, 20);
+			btn_start_.create(*this, nana::rectangle(10, 10, 100, 20));
+			btn_start_.caption(("Start"));
+			btn_start_.events().click([this] { _m_start(); });
+			btn_cancel_.create(*this, nana::rectangle(120, 10, 100, 20));
+			btn_cancel_.caption(("Cancel"));
+			btn_cancel_.events().click([this] { _m_cancel(); });
+			prog_.create(*this, nana::rectangle(10, 40, 280, 20));
 		}
-	 private:
+	private:
 		void _m_start()
 		{
 			working_ = true;
 			btn_start_.enabled(false);
 			prog_.amount(100);
-			for(int i = 0; i < 100 && working_; ++i)
+			for (int i = 0; i < 100 && working_; ++i)
 			{
 				nana::system::sleep(1000); //a long-running simulation
 				prog_.value(i + 1);
 			}
 			btn_start_.enabled(true);
 		}
-		void _m_cancel(){working_ = false;}
+		void _m_cancel() { working_ = false; }
 
-		bool 				working_ ;
-		nana::button 	btn_start_ ;
-		nana::button 	btn_cancel_ ;
-		nana::progressbar prog_ ;
+		bool                            working_;
+		nana::button    btn_start_;
+		nana::button    btn_cancel_;
+		nana::progress prog_;
 	};
 
 	int main()
 	{
-		example ex;
+		example2 ex;
 		ex.show();
 		nana::exec();
 		return 0;
@@ -390,29 +392,30 @@ Consider the following solution:
 
 	#include <nana/gui/wvl.hpp>
 	#include <nana/gui/widgets/button.hpp>
-	#include <nana/gui/widgets/progressbar.hpp>
+	#include <nana/gui/widgets/progress.hpp>
 	#include <nana/threads/pool.hpp>
-	class example : public nana::form
+	
+	class example3 : public nana::form
 	{
-	 public:
-		example()
+	public:
+		example3()
 		{
-			btn_start_.create(*this, 10, 10, 100, 20);
-			btn_start_.caption(STR("Start"));
-			btn_start_.events().click(nana::threads::pool_push(pool_, *this, &example::_m_start));
-			btn_cancel_.create(*this, 120, 10, 100, 20);
-			btn_cancel_.caption(STR("Cancel"));
-			btn_cancel_.events().click(*this, &example::_m_cancel);
-			prog_.create(*this, 10, 40, 280, 20);
-			this->make_event<nana::events::unload>(*this, &example::_m_cancel);
+			btn_start_.create(*this, nana::rectangle(10, 10, 100, 20));
+			btn_start_.caption(("Start"));
+			btn_start_.events().click(nana::threads::pool_push(pool_, *this, &example3::_m_start));
+			btn_cancel_.create(*this, nana::rectangle(120, 10, 100, 20));
+			btn_cancel_.caption(("Cancel"));
+			btn_cancel_.events().click([this] { _m_cancel(); });
+			prog_.create(*this, nana::rectangle(10, 40, 280, 20));
+			//this->umake_event(btn_cancel_.events().click);
 		}
-	 private:
+	private:
 		void _m_start()
 		{
 			working_ = true;
 			btn_start_.enabled(false);
 			prog_.amount(100);
-			for(int i = 0; i < 100 && working_; ++i)
+			for (int i = 0; i < 100 && working_; ++i)
 			{
 				nana::system::sleep(1000); //a long-running simulation
 				prog_.value(i + 1);
@@ -423,17 +426,17 @@ Consider the following solution:
 		{
 			working_ = false;
 		}
-		private:
+	private:
 		volatile bool working_;
 		nana::button btn_start_;
 		nana::button btn_cancel_;
-		nana::progressbar prog_;
+		nana::progress prog_;
 		nana::threads::pool pool_;
 	};
 
 	int main()
 	{
-		example ex;
+		example3 ex;
 		ex.show();
 		nana::exec();
 		return 0;
@@ -453,23 +456,23 @@ A long time blocking operation is usually uncancellable and not able to get the 
 
 	#include <nana/gui/wvl.hpp>
 	#include <nana/gui/widgets/button.hpp>
-	#include <nana/gui/widgets/progressbar.hpp>
+	#include <nana/gui/widgets/progress.hpp>
 	#include <nana/threads/pool.hpp>
-	class example
-	: public nana::form
+	
+	class example4 : public nana::form
 	{
-	 public:
-		example()
+	public:
+		example4()
 		{
-			btn_start_.create(*this, 10, 10, 100, 20);
-			btn_start_.caption(STR("Start"));
-			btn_start_.events().click(nana::threads::pool_push(pool_, *this, &example::_m_start));
-			btn_start_.events().click(nana::threads::pool_push(pool_, *this, &example::_m_ui_update));
-			prog_.create(*this, 10, 40, 280, 20);
-			prog_.style(false);
-		this->make_event<nana::events::unload>(*this, &example::_m_cancel);
+			btn_start_.create(*this, nana::rectangle(10, 10, 100, 20));
+			btn_start_.caption(("Start"));
+			btn_start_.events().click(nana::threads::pool_push(pool_, *this, &example4::_m_start));
+			btn_start_.events().click(nana::threads::pool_push(pool_, *this, &example4::_m_ui_update));
+			prog_.create(*this, nana::rectangle(10, 40, 280, 20));
+			//prog_.style(false);
+			//this->make_event<nana::events::unload>(*this, &example::_m_cancel);
 		}
-	 private:
+	private:
 		void _m_start()
 		{
 			btn_start_.enabled(false);
@@ -478,29 +481,29 @@ A long time blocking operation is usually uncancellable and not able to get the 
 		}
 		void _m_ui_update()
 		{
-			while(btn_start_.enabled() == false)
+			while (btn_start_.enabled() == false)
 			{
 				prog_.inc();
 				nana::system::sleep(100);
 			}
 		}
-		void _m_cancel(const nana::eventinfo& ei)
+		void _m_cancel(const nana::event_arg& ei)
 		{
-			if(false == btn_start_.enabled())
-			ei.unload.cancel = true;
+			if (false == btn_start_.enabled())
+				ei.unload.cancel = true; // Will not compile
 		}
-	 private:
+	private:
 		nana::button btn_start_;
-		nana::progressbar prog_;
+		nana::progress prog_;
 		nana::threads::pool pool_;
 	};
 
 	int main()
 	{
-	example ex;
-	ex.show();
-	nana::exec();
-	return 0;
+		example4 ex;
+		ex.show();
+		nana::exec();
+		return 0;
 	}
 
 ![](long-running3.jpg)
